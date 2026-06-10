@@ -1,0 +1,11 @@
+{
+  "name": "UPTBAL CART-ID",
+  "short_name": "CART-ID",
+  "icons": [
+    { "src": "assets/icons/idcard-icon.svg", "sizes": "512x512", "type": "image/svg+xml" }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FFD100",
+  "theme_color": "#0D2B90"
+}
