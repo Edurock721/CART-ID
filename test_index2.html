@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UPTBAL Carnets</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- QRCode Generator Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- HTML2Canvas for exporting card -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+
+    <div id="auth-overlay" class="auth-overlay">
+        <div class="auth-panel glass-panel">
+            <h2>Acceso</h2>
+            <input id="auth-username" placeholder="Usuario (admin para administrador)">
+            <input id="auth-password" type="password" placeholder="Contraseña">
+            <div class="auth-actions">
+                <button id="auth-login" class="btn-primary">Ingresar</button>
+                <button id="auth-register" class="btn-secondary">Registrar usuario</button>
+            </div>
+            <div id="auth-message" class="auth-message"></div>
+        </div>
+    </div>
+
+    <div class="app-container">
+        
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <i class="fa-solid fa-id-card"></i> UPTBAL <span>Carnets</span>
+            </div>
+            <div class="header-actions">
+                <button id="export-btn" class="btn-primary">
+                    <i class="fa-solid fa-download"></i> Exportar Carnet
+                </button>
+                <div id="auth-controls" style="display:none; margin-left:12px;">
+                    <button id="btn-admin" class="btn-secondary" style="margin-right:8px;">Admin</button>
+                    <button id="btn-logout" class="btn-danger">Cerrar sesión</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            
+            <!-- Form Section -->
+            <section class="form-section glass-panel">
+                <h2><i class="fa-solid fa-pen-to-square"></i> Datos del Estudiante/Personal</h2>
+                
+                <form id="id-form" class="id-form">
+                    
+                    <!-- Basic Info -->
+                    <div class="form-group">
+                        <label for="nombres">Nombres</label>
+                        <input type="text" id="nombres" placeholder="Ej. Juan Carlos" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="apellidos">Apellidos</label>
+                        <input type="text" id="apellidos" placeholder="Ej. Pérez Gómez" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="fecha-nac">Fecha de Nacimiento</label>
+                            <input type="date" id="fecha-nac" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="cedula">C.I. (Cédula)</label>
+                            <input type="text" id="cedula" placeholder="Ej. 12345678" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="rol">Rol / Puesto</label>
+                            <select id="rol" required>
+                                <option value="Estudiante">Estudiante</option>
+                                <option value="Profesor">Profesor</option>
+                                <option value="Administrativo">Administrativo</option>
+                                <option value="Obrero">Obrero</option>
+                                <option value="Visitante">Visitante</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="jerarquia">Jerarquía / Nivel</label>
+                            <input type="text" id="jerarquia" placeholder="Ej. Pregrado, Director, etc.">
+                        </div>
+                    </div>
+
+                    <!-- Custom Text Fields -->
+                    <div class="form-separator">Textos Personalizados</div>
+                    <div class="form-group">
+                        <label for="encabezado-front">Encabezado Frontal (Logo/Título)</label>
+                        <input type="text" id="encabezado-front" placeholder="Ej. Departamento de Informática" value="REPUBLICA BOLIVARIANA DE VENEZUELA">
+                    </div>
+                    <div class="form-group">
+                        <label for="info-back">Información Posterior (Relevancia)</label>
+                        <textarea id="info-back" rows="3" placeholder="Ej. Este carnet es intransferible..."></textarea>
+                    </div>
+
+                    <!-- Emergency & Medical (For QR) -->
+                    <div class="form-separator">Información Médica y Emergencia (QR)</div>
+                    <div class="form-group">
+                        <label for="contacto-emergencia">Número de Emergencia</label>
+                        <input type="tel" id="contacto-emergencia" placeholder="Ej. +58 412 1234567">
+                    </div>
+                    <div class="form-group">
+                        <label for="alergico">¿Es Alérgico? Detalle:</label>
+                        <input type="text" id="alergico" placeholder="Ej. No / Sí, a la Penicilina">
+                    </div>
+
+                    <!-- Media Uploads -->
+                    <div class="form-separator">Imágenes y Firma</div>
+                    
+                    <div class="media-group">
+                        <label>Foto de Perfil</label>
+                        <div class="upload-controls">
+                            <label class="btn-secondary file-upload">
+                                <i class="fa-solid fa-upload"></i> Subir
+                                <input type="file" id="foto-upload" accept="image/*">
+                            </label>
+                            <button type="button" id="btn-camara" class="btn-secondary">
+                                <i class="fa-solid fa-camera"></i> Tomar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="media-group">
+                        <label>Logo de Institución</label>
+                        <label class="btn-secondary file-upload">
+                            <i class="fa-solid fa-upload"></i> Subir Logo
+                            <input type="file" id="logo-upload" accept="image/*">
+                        </label>
+                    </div>
+
+                    <div class="media-group signature-section">
+                        <label>Firma Digital (Parte Posterior)</label>
+                        <div class="signature-tabs">
+                            <button type="button" class="tab-btn active" data-tab="draw">Dibujar</button>
+                            <button type="button" class="tab-btn" data-tab="upload">Subir</button>
+                        </div>
+                        
+                        <div id="tab-draw" class="tab-content active">
+                            <canvas id="signature-pad" width="300" height="150"></canvas>
+                            <div class="sig-controls">
+                                <button type="button" id="clear-sig" class="btn-small btn-danger"><i class="fa-solid fa-eraser"></i> Limpiar</button>
+                                <button type="button" id="save-sig" class="btn-small btn-success"><i class="fa-solid fa-check"></i> Aplicar</button>
+                            </div>
+                        </div>
+
+                        <div id="tab-upload" class="tab-content" style="display: none;">
+                            <label class="btn-secondary file-upload">
+                                <i class="fa-solid fa-upload"></i> Subir Firma (.png sin fondo)
+                                <input type="file" id="firma-upload" accept="image/*">
+                            </label>
+                        </div>
+                    </div>
+
+                </form>
+            </section>
+
+            <!-- Preview Section -->
+            <section class="preview-section">
+                <h2><i class="fa-solid fa-eye"></i> Vista Previa (En Vivo)</h2>
+                
+                <div class="card-container" id="card-render-area">
+                    
+                    <!-- Front Card -->
+                    <div class="id-card card-front" id="card-front">
+                        <div class="card-bg"></div>
+                        
+                        <div class="card-header">
+                            <img id="preview-logo" src="https://via.placeholder.com/60" alt="Logo Institución" class="inst-logo">
+                            <div class="header-text" style="text-align: center; width: 100%;">
+                                <h3 style="font-size: 0.55rem;">UNIVERSIDAD POLITÉCNICA TERRITORIAL DE BARLOVENTO</h3>
+                                <p>"ARGELIA LAYA"</p>
+                                <div class="custom-header" id="preview-encabezado">REPUBLICA BOLIVARIANA DE VENEZUELA</div>
+                            </div>
+                        </div>
+
+                        <div class="card-body">
+                            <div class="photo-container">
+                                <img id="preview-foto" src="https://via.placeholder.com/150" alt="Foto Perfil">
+                            </div>
+                            
+                            <div class="user-details">
+                                <div class="name-block">
+                                    <h4 id="preview-nombres">Nombres</h4>
+                                    <h3 id="preview-apellidos">Apellidos</h3>
+                                </div>
+                                <div class="info-row">
+                                    <span class="label">C.I.:</span>
+                                    <span class="value" id="preview-cedula">-</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="label">ROL | JERARQUÍA:</span>
+                                    <span class="value" style="display:flex; gap:5px; align-items:center;">
+                                        <div class="role-badge" id="preview-rol">Estudiante</div>
+                                        <div class="role-badge" style="background:#50E3C2; color:#111 !important;" id="preview-jerarquia">-</div>
+                                    </span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="label">F. NAC.:</span>
+                                    <span class="value" id="preview-fecha">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-footer">
+                            <div class="barcode"></div>
+                        </div>
+                    </div>
+
+                    <!-- Back Card -->
+                    <div class="id-card card-back" id="card-back">
+                        <div class="card-bg-back"></div>
+                        
+                        <div class="back-header">
+                            <h3>INFORMACIÓN IMPORTANTE</h3>
+                        </div>
+
+                        <div class="back-body">
+                            <div class="custom-back-text" id="preview-info-back">
+                                Este carnet es personal e intransferible. Identifica al portador como miembro activo de la institución. En caso de emergencia favor contactarse al número escaneable en el código QR.
+                            </div>
+                            
+                            <div class="qr-and-signature">
+                                <div class="qr-box">
+                                    <div id="qrcode"></div>
+                                    <span>Escanea en Emergencia</span>
+                                </div>
+                                
+                                <div class="signature-box">
+                                    <img id="preview-firma" src="" alt="Firma del Director" style="display: none;">
+                                    <div class="sig-line"></div>
+                                    <span>Firma del Director</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </section>
+        </main>
+        
+        <!-- Camera Modal -->
+        <div id="camera-modal" class="modal">
+            <div class="modal-content glass-panel">
+                <h3>Tomar Foto</h3>
+                <video id="video-stream" autoplay playsinline></video>
+                <div class="modal-actions">
+                    <button id="capture-btn" class="btn-primary"><i class="fa-solid fa-camera"></i> Capturar</button>
+                    <button id="close-camera" class="btn-danger">Cancelar</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Main Logic -->
+    <!-- Admin Modal (gestión de usuarios) -->
+    <div id="admin-modal" class="modal">
+        <div class="modal-content glass-panel admin-panel">
+            <h3>Panel de Administración</h3>
+            <div class="admin-actions">
+                <div class="admin-create">
+                    <input id="admin-new-username" placeholder="Nuevo usuario">
+                    <input id="admin-new-password" type="password" placeholder="Contraseña">
+                    <button id="admin-create-btn" class="btn-primary">Crear</button>
+                </div>
+                <div class="admin-tools">
+                    <button id="admin-change-admin-pw" class="btn-secondary">Cambiar contraseña admin</button>
+                    <button id="admin-close" class="btn-danger">Cerrar</button>
+                </div>
+            </div>
+
+            <div class="admin-list">
+                <table id="admin-user-table">
+                    <thead><tr><th>Usuario</th><th>Estado</th><th>Acciones</th></tr></thead>
+                    <tbody id="admin-user-list"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
