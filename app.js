@@ -6,7 +6,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const authUsername = document.getElementById('auth-username');
     const authPassword = document.getElementById('auth-password');
     const authLoginBtn = document.getElementById('auth-login');
-    const authRegisterBtn = document.getElementById('auth-register');
     const authControls = document.getElementById('auth-controls');
     const btnLogout = document.getElementById('btn-logout');
     const btnAdmin = document.getElementById('btn-admin');
@@ -58,16 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch(e){ authMsg.textContent = 'Error al procesar credenciales'; }
     }
 
-    async function registerUser(username, password){
-        try{
-            const r = await createUserLocal(username, password, false);
-            if(!r.ok){ authMsg.textContent = r.message || 'Error registro'; return; }
-            authMsg.textContent = 'Usuario registrado. Ingresa ahora.';
-        } catch(e){ authMsg.textContent = 'Error interno al registrar'; }
-    }
-
     authLoginBtn && authLoginBtn.addEventListener('click', () => { login(authUsername.value.trim(), authPassword.value); });
-    authRegisterBtn && authRegisterBtn.addEventListener('click', () => { registerUser(authUsername.value.trim(), authPassword.value); });
 
     btnLogout && btnLogout.addEventListener('click', async () => {
         setCurrentUser(null); showAuthOverlay(true); updateAuthControls();
