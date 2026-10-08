@@ -1,39 +1,30 @@
-# UPTBAL WebApp — Autenticación local (demo)
+# UPTBAL WebApp
 
-Instrucciones para ejecutar el servidor y cliente localmente:
+La aplicación web es estática y puede publicarse en GitHub Pages. La autenticación centralizada y el directorio de cuentas usan Supabase Auth; no hay registro público.
 
-1) Iniciar el backend (Node/Express + SQLite):
+## Configuración de Supabase
 
-```powershell
-cd server
-npm install
-cp .env.example .env
-# editar .env si quieres cambiar secretos
-npm start
-```
+1. En **Authentication → Providers → Email**, deja desactivado el registro público.
+2. En **Authentication → Users**, crea y confirma la cuenta del administrador inicial.
+3. En **SQL Editor**, ejecuta `supabase/bootstrap-admin.sql` después de reemplazar `REPLACE_WITH_ADMIN_EMAIL` por el correo exacto del administrador. Confirma que el resultado muestre una fila con `role = admin`. Luego cierra e inicia sesión otra vez para renovar el token con el nuevo rol.
+4. En **Project Settings → API**, copia la Project URL y la clave pública `anon` o `publishable` en `supabase-config.js`. Esa clave está diseñada para el cliente web; nunca pongas `service_role`, contraseñas ni secretos en ese archivo.
+5. Despliega la función administrativa desde la raíz `WebApp` con Supabase CLI:
 
-2) Servir el cliente (puedes usar Python):
+   ```powershell
+   supabase login
+   supabase link --project-ref xksujgtvcntuhhqauqwi
+   supabase functions deploy admin-users
+   ```
 
-```powershell
-cd ..
-python -m http.server 8000
-```
+   La función utiliza los secretos gestionados por Supabase (`SUPABASE_URL`, `SUPABASE_ANON_KEY` y `SUPABASE_SERVICE_ROLE_KEY`). La clave privilegiada se queda del lado del servidor; nunca la copies al sitio ni a GitHub.
+6. Publica en GitHub Pages `index.html`, `app.js`, `supabase-config.js`, `style.css` y `assets/`.
 
-3) Abrir en el navegador: http://localhost:8000
+El panel usa la función `admin-users`, que valida el JWT y exige `app_metadata.role = admin` antes de listar, crear, bloquear, restablecer contraseñas o eliminar cuentas. Las cuentas administradoras no se pueden bloquear ni eliminar desde este panel. Las contraseñas nuevas deben tener al menos 10 caracteres.
 
-Credenciales iniciales:
-- admin / (valor de `INIT_ADMIN_PW` en `.env`, por defecto `admin`).
+Las cuentas y contraseñas guardadas antes en cada dispositivo no se importan automáticamente. Crea de nuevo las cuentas desde el panel después de configurar Supabase. Los datos de carnet que el usuario mantenga en el navegador siguen siendo locales.
 
-Qué se implementó ahora:
-- Backend con SQLite y rutas para `register` y `login`.
-- Hashing de contraseñas con `bcryptjs`.
-- JWT para autenticación; el front almacena el token en `localStorage`.
-- Rutas admin protegidas para listar/crear/bloquear/eliminar usuarios desde el panel gráfico.
- - Refresh tokens: el servidor emite `refreshToken` (rotado) para renovar access tokens automáticamente.
- - Endpoint admin para cambiar la contraseña de cualquier usuario (`POST /api/admin/users/:username/password`).
- - Ahora los `refreshToken` se guardan como cookie `HttpOnly` (más seguro). Si sirves el cliente desde otro origen, ajusta `CLIENT_ORIGIN` en el `.env` o en el entorno del servidor (por defecto `http://localhost:8000`).
+## Aplicación Android
 
-Limitaciones y próximos pasos recomendados:
-- En producción, ejecutar detrás de HTTPS, configurar CORS y variables de entorno seguras.
-- Implementar endpoints para cambiar contraseña admin sin reiniciar.
-- Añadir logging/auditoría, pruebas unitarias y CI.
+La APK carga la versión publicada en <https://edurock721.github.io/CART-ID/> cada vez que se abre y no reutiliza la caché web. Después de subir cambios a la fuente configurada de GitHub Pages y completar su publicación, estarán disponibles la próxima vez que se abra la APK, sin reinstalarla. Una sesión que ya está abierta no se recarga automáticamente. Se requiere conexión a Internet; si no se puede cargar el sitio, se muestra la versión incluida en la APK.
+
+La APK solo permite navegar dentro de ese sitio HTTPS. Los cambios del código nativo de Android todavía requieren compilar e instalar una nueva APK. La versión nativa con esta integración es la 1.1 (código 2).

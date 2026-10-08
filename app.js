@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', async () => {
 
-    // --- AUTHENTICACIÓN LOCAL (cliente-only) ---
     const authOverlay = document.getElementById('auth-overlay');
     const authMsg = document.getElementById('auth-message');
     const authUsername = document.getElementById('auth-username');
@@ -10,60 +9,71 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btnLogout = document.getElementById('btn-logout');
     const btnAdmin = document.getElementById('btn-admin');
 
-    const USERS_KEY = 'uptbal_users_v1';
-    const CURRENT_KEY = 'uptbal_current_user';
+    const config = window.UPTBAL_SUPABASE_CONFIG;
+    const hasSupabaseConfig = config
+        && typeof config.url === 'string'
+        && typeof config.anonKey === 'string'
+        && config.url.startsWith('https://')
+        && config.anonKey.length > 20
+        && !config.anonKey.startsWith('REPLACE_')
+        && window.supabase?.createClient;
+    const supabase = hasSupabaseConfig
+        ? window.supabase.createClient(config.url, config.anonKey)
+        : null;
+    let currentSession = null;
 
-    function showAuthOverlay(show){ if(show) authOverlay.style.display = 'flex'; else authOverlay.style.display = 'none'; }
-
-    function getUsersLocal(){ try{ return JSON.parse(localStorage.getItem(USERS_KEY) || '[]'); } catch(e){ return []; } }
-    function saveUsersLocal(list){ localStorage.setItem(USERS_KEY, JSON.stringify(list)); }
-    function getCurrentUser(){ return localStorage.getItem(CURRENT_KEY); }
-    function setCurrentUser(u){ if(u) localStorage.setItem(CURRENT_KEY, u); else localStorage.removeItem(CURRENT_KEY); }
-
-    async function generateSalt(){ const buf = crypto.getRandomValues(new Uint8Array(16)); return btoa(String.fromCharCode(...buf)); }
-    async function hashPassword(password, salt){
-        const enc = new TextEncoder();
-        const pw = enc.encode(password);
-        const saltBytes = Uint8Array.from(atob(salt), c=>c.charCodeAt(0));
-        const key = await crypto.subtle.importKey('raw', pw, {name:'PBKDF2'}, false, ['deriveBits']);
-        const derived = await crypto.subtle.deriveBits({name:'PBKDF2', salt: saltBytes, iterations: 100000, hash: 'SHA-256'}, key, 256);
-        const hashArray = Array.from(new Uint8Array(derived));
-        return btoa(String.fromCharCode(...hashArray));
+    function showAuthOverlay(show) {
+        authOverlay.style.display = show ? 'flex' : 'none';
     }
 
-    async function findUser(username){ return getUsersLocal().find(u => u.username === username); }
-    async function createUserLocal(username, password, isAdmin=false){
-        const users = getUsersLocal(); if(users.find(u=>u.username===username)) return { ok:false, message:'Usuario ya existe' };
-        const salt = await generateSalt(); const hash = await hashPassword(password, salt);
-        users.push({ username, hash, salt, blocked: false, admin: isAdmin?true:false, created_at: new Date().toISOString() });
-        saveUsersLocal(users); return { ok:true };
+    function updateAuthControls() {
+        const isSignedIn = Boolean(currentSession);
+        const isAdmin = currentSession?.user?.app_metadata?.role === 'admin';
+        authControls.style.display = isSignedIn ? 'flex' : 'none';
+        btnAdmin.style.display = isAdmin ? 'inline-flex' : 'none';
     }
 
-    async function verifyPasswordLocal(username, password){
-        const user = await findUser(username); if(!user) return false; if(user.blocked) return 'blocked';
-        const h = await hashPassword(password, user.salt);
-        return h === user.hash;
+    function setAuthState(session) {
+        currentSession = session;
+        showAuthOverlay(!session);
+        updateAuthControls();
     }
 
-    async function ensureMaster(){ const users = getUsersLocal(); if(!users.find(u=>u.username==='master')){ await createUserLocal('master','admin', true); }
+    function getErrorMessage(error) {
+        return error?.message || 'Ocurrió un error inesperado.';
     }
 
-    async function login(username, password){
-        try{
-            const v = await verifyPasswordLocal(username, password);
-            if(v === 'blocked'){ authMsg.textContent = 'Usuario bloqueado.'; return; }
-            if(!v){ authMsg.textContent = 'Usuario o contraseña incorrectos.'; return; }
-            setCurrentUser(username); authMsg.textContent = ''; showAuthOverlay(false); updateAuthControls();
-        } catch(e){ authMsg.textContent = 'Error al procesar credenciales'; }
+    async function signIn() {
+        if (!supabase) {
+            authMsg.textContent = 'Falta configurar la clave pública de Supabase en supabase-config.js.';
+            return;
+        }
+        authLoginBtn.disabled = true;
+        authMsg.textContent = '';
+        const { error } = await supabase.auth.signInWithPassword({
+            email: authUsername.value.trim(),
+            password: authPassword.value
+        });
+        authLoginBtn.disabled = false;
+        if (error) {
+            authMsg.textContent = getErrorMessage(error);
+            return;
+        }
+        authPassword.value = '';
     }
 
-    authLoginBtn && authLoginBtn.addEventListener('click', () => { login(authUsername.value.trim(), authPassword.value); });
-
-    btnLogout && btnLogout.addEventListener('click', async () => {
-        setCurrentUser(null); showAuthOverlay(true); updateAuthControls();
+    authLoginBtn.addEventListener('click', signIn);
+    authPassword.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') signIn();
     });
 
-    // Admin modal elements (will use API)
+    btnLogout.addEventListener('click', async () => {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+            alert(`No se pudo cerrar la sesión: ${getErrorMessage(error)}`);
+        }
+    });
+
     const adminModal = document.getElementById('admin-modal');
     const adminUserListEl = document.getElementById('admin-user-list');
     const adminCreateBtn = document.getElementById('admin-create-btn');
@@ -72,64 +82,156 @@ document.addEventListener('DOMContentLoaded', async () => {
     const adminCloseBtn = document.getElementById('admin-close');
     const adminChangeAdminPw = document.getElementById('admin-change-admin-pw');
 
-    function openAdminModal(){ renderAdminUsers(); adminModal.style.display = 'flex'; }
-    function closeAdminModal(){ adminModal.style.display = 'none'; }
-    btnAdmin && btnAdmin.addEventListener('click', () => { openAdminModal(); });
-    adminCloseBtn && adminCloseBtn.addEventListener('click', closeAdminModal);
-
-    // apiFetch replaced by local operations; network not required in client-only mode
-    function apiFetch(){ return Promise.reject(new Error('No API in client-only mode')); }
-
-    async function renderAdminUsers(){
-        adminUserListEl.innerHTML = '';
-        try{
-            const users = getUsersLocal();
-            users.forEach(u => {
-                const tr = document.createElement('tr');
-                if(u.blocked) tr.classList.add('blocked');
-                const tdUser = document.createElement('td'); tdUser.textContent = u.username;
-                const tdState = document.createElement('td'); tdState.textContent = u.blocked ? 'BLOQUEADO' : 'ACTIVO';
-                const tdActions = document.createElement('td');
-                const btnToggle = document.createElement('button'); btnToggle.className = 'btn-secondary'; btnToggle.textContent = u.blocked ? 'Desbloquear' : 'Bloquear';
-                btnToggle.addEventListener('click', async () => {
-                    const users = getUsersLocal(); const found = users.find(x=>x.username===u.username); if(found){ found.blocked = !found.blocked; saveUsersLocal(users); renderAdminUsers(); }
-                });
-                const btnChangePw = document.createElement('button'); btnChangePw.className = 'btn-primary'; btnChangePw.textContent = 'Cambiar contraseña';
-                btnChangePw.addEventListener('click', async () => {
-                    const npw = prompt('Nueva contraseña para ' + u.username + ':'); if(!npw) return; const users = getUsersLocal(); const found = users.find(x=>x.username===u.username); if(found){ found.salt = await generateSalt(); found.hash = await hashPassword(npw, found.salt); saveUsersLocal(users); alert('Contraseña actualizada.'); renderAdminUsers(); }
-                });
-                const btnDelete = document.createElement('button'); btnDelete.className = 'btn-danger'; btnDelete.textContent = 'Eliminar';
-                btnDelete.addEventListener('click', async () => { if(!confirm('Eliminar usuario '+u.username+'?')) return; const users = getUsersLocal(); const idx = users.findIndex(x=>x.username===u.username); if(idx>=0){ users.splice(idx,1); saveUsersLocal(users); renderAdminUsers(); } });
-                tdActions.appendChild(btnToggle); tdActions.appendChild(document.createTextNode(' ')); tdActions.appendChild(btnChangePw); tdActions.appendChild(document.createTextNode(' ')); tdActions.appendChild(btnDelete);
-                tr.appendChild(tdUser); tr.appendChild(tdState); tr.appendChild(tdActions);
-                adminUserListEl.appendChild(tr);
-            });
-        } catch(e){ alert('Error al conectar con servidor'); }
+    async function callAdminFunction(payload) {
+        if (!supabase || !currentSession) {
+            throw new Error('Inicia sesión para usar la administración.');
+        }
+        const { data, error } = await supabase.functions.invoke('admin-users', { body: payload });
+        if (error) {
+            throw new Error(error.message || 'No se pudo conectar con la función administrativa.');
+        }
+        if (data?.error) {
+            throw new Error(data.error);
+        }
+        return data;
     }
 
-    adminCreateBtn && adminCreateBtn.addEventListener('click', async () => {
-        const u = (adminNewUser.value || '').trim();
-        const p = adminNewPass.value || '';
-        if(!u || !p){ alert('Usuario y contraseña requeridos.'); return; }
-        try{
-            const r = await createUserLocal(u, p, false);
-            if(r.ok){ adminNewUser.value=''; adminNewPass.value=''; renderAdminUsers(); } else { alert(r.message || 'Error'); }
-        } catch(e){ alert('Error al conectar con servidor'); }
+    async function renderAdminUsers() {
+        adminUserListEl.replaceChildren();
+        const loadingRow = adminUserListEl.insertRow();
+        const loadingCell = loadingRow.insertCell();
+        loadingCell.colSpan = 3;
+        loadingCell.textContent = 'Cargando cuentas…';
+
+        try {
+            const { users } = await callAdminFunction({ action: 'list' });
+            adminUserListEl.replaceChildren();
+            users.forEach((user) => {
+                const row = adminUserListEl.insertRow();
+                if (user.blocked) row.classList.add('blocked');
+                row.insertCell().textContent = user.email || '(sin correo)';
+                row.insertCell().textContent = user.role === 'admin'
+                    ? 'ADMINISTRADOR'
+                    : user.blocked ? 'BLOQUEADO' : 'ACTIVO';
+
+                const actions = row.insertCell();
+                const addButton = (label, className, handler, disabled = false) => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = className;
+                    button.textContent = label;
+                    button.disabled = disabled;
+                    button.addEventListener('click', handler);
+                    actions.append(button, document.createTextNode(' '));
+                };
+                const runAction = async (action, confirmation) => {
+                    if (confirmation && !confirm(confirmation)) return;
+                    try {
+                        await action();
+                        await renderAdminUsers();
+                    } catch (error) {
+                        alert(`Error administrativo: ${getErrorMessage(error)}`);
+                    }
+                };
+
+                addButton(
+                    user.blocked ? 'Desbloquear' : 'Bloquear',
+                    'btn-secondary',
+                    () => runAction(
+                        () => callAdminFunction({ action: 'set-blocked', userId: user.id, blocked: !user.blocked }),
+                        `${user.blocked ? '¿Desbloquear' : '¿Bloquear'} a ${user.email}?`
+                    ),
+                    user.role === 'admin'
+                );
+                addButton('Cambiar contraseña', 'btn-primary', () => runAction(async () => {
+                    const password = prompt(`Nueva contraseña para ${user.email} (mínimo 10 caracteres):`);
+                    if (password === null) return;
+                    await callAdminFunction({ action: 'update-password', userId: user.id, password });
+                    alert('Contraseña actualizada en Supabase.');
+                }));
+                addButton(
+                    'Eliminar',
+                    'btn-danger',
+                    () => runAction(
+                        () => callAdminFunction({ action: 'delete', userId: user.id }),
+                        `¿Eliminar permanentemente la cuenta ${user.email}?`
+                    ),
+                    user.role === 'admin'
+                );
+            });
+            if (!users.length) {
+                const row = adminUserListEl.insertRow();
+                const cell = row.insertCell();
+                cell.colSpan = 3;
+                cell.textContent = 'No hay cuentas registradas.';
+            }
+        } catch (error) {
+            adminUserListEl.replaceChildren();
+            const row = adminUserListEl.insertRow();
+            const cell = row.insertCell();
+            cell.colSpan = 3;
+            cell.textContent = `No se pudieron cargar las cuentas: ${getErrorMessage(error)}`;
+        }
+    }
+
+    function openAdminModal() {
+        adminModal.style.display = 'flex';
+        renderAdminUsers();
+    }
+
+    btnAdmin.addEventListener('click', openAdminModal);
+    adminCloseBtn.addEventListener('click', () => { adminModal.style.display = 'none'; });
+
+    adminCreateBtn.addEventListener('click', async () => {
+        const email = adminNewUser.value.trim();
+        const password = adminNewPass.value;
+        if (!email || !password) {
+            alert('Ingresa el correo y la contraseña inicial.');
+            return;
+        }
+        adminCreateBtn.disabled = true;
+        try {
+            await callAdminFunction({ action: 'create', email, password });
+            adminNewUser.value = '';
+            adminNewPass.value = '';
+            await renderAdminUsers();
+        } catch (error) {
+            alert(`No se pudo crear la cuenta: ${getErrorMessage(error)}`);
+        } finally {
+            adminCreateBtn.disabled = false;
+        }
     });
 
-    adminChangeAdminPw && adminChangeAdminPw.addEventListener('click', async () => {
-        const npw = prompt('Nueva contraseña admin:');
-        if(!npw) return;
-        const users = getUsersLocal(); const adm = users.find(x=>x.username==='master');
-        if(!adm){ alert('No existe usuario master'); return; }
-        adm.salt = await generateSalt(); adm.hash = await hashPassword(npw, adm.salt); saveUsersLocal(users); alert('Contraseña admin actualizada.');
+    adminChangeAdminPw.addEventListener('click', async () => {
+        const password = prompt('Nueva contraseña (mínimo 10 caracteres):');
+        if (password === null) return;
+        if (password.length < 10) {
+            alert('La contraseña debe tener al menos 10 caracteres.');
+            return;
+        }
+        try {
+            const { error } = await supabase.auth.updateUser({ password });
+            if (error) throw error;
+            alert('Tu contraseña se actualizó en Supabase.');
+        } catch (error) {
+            alert(`No se pudo cambiar la contraseña: ${getErrorMessage(error)}`);
+        }
     });
 
-    // Ensure master exists and show overlay if not logged
-    await ensureMaster();
-    if(!getCurrentUser()) showAuthOverlay(true); else showAuthOverlay(false);
-    function updateAuthControls(){ const cur = getCurrentUser(); if(cur){ authControls.style.display = 'flex'; btnAdmin.style.display = (cur==='master') ? 'inline-flex' : 'none'; } else { authControls.style.display = 'none'; btnAdmin.style.display = 'none'; } }
-    updateAuthControls();
+    if (!supabase) {
+        authMsg.textContent = 'Falta configurar la clave pública de Supabase en supabase-config.js.';
+        authLoginBtn.disabled = true;
+        setAuthState(null);
+    } else {
+        supabase.auth.onAuthStateChange((_event, session) => setAuthState(session));
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+            authMsg.textContent = `No se pudo comprobar la sesión: ${getErrorMessage(error)}`;
+            setAuthState(null);
+        } else {
+            setAuthState(data.session);
+        }
+    }
 
     // --- DOM Elements ---
     const inputs = {

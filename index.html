@@ -24,8 +24,8 @@
     <div id="auth-overlay" class="auth-overlay">
         <div class="auth-panel glass-panel">
             <h2>Acceso</h2>
-            <input id="auth-username" placeholder="Usuario (admin para administrador)">
-            <input id="auth-password" type="password" placeholder="Contraseña">
+            <input id="auth-username" type="email" autocomplete="username" placeholder="Correo electrónico">
+            <input id="auth-password" type="password" autocomplete="current-password" placeholder="Contraseña">
             <div class="auth-actions">
                 <button id="auth-login" class="btn-primary">Ingresar</button>
             </div>
@@ -278,25 +278,27 @@
             <h3>Panel de Administración</h3>
             <div class="admin-actions">
                 <div class="admin-create">
-                    <input id="admin-new-username" placeholder="Nuevo usuario">
-                    <input id="admin-new-password" type="password" placeholder="Contraseña">
+                    <input id="admin-new-username" type="email" autocomplete="off" placeholder="Correo del nuevo usuario">
+                    <input id="admin-new-password" type="password" autocomplete="new-password" placeholder="Contraseña inicial">
                     <button id="admin-create-btn" class="btn-primary">Crear</button>
                 </div>
                 <div class="admin-tools">
-                    <button id="admin-change-admin-pw" class="btn-secondary">Cambiar contraseña admin</button>
+                    <button id="admin-change-admin-pw" class="btn-secondary">Cambiar mi contraseña</button>
                     <button id="admin-close" class="btn-danger">Cerrar</button>
                 </div>
             </div>
 
             <div class="admin-list">
                 <table id="admin-user-table">
-                    <thead><tr><th>Usuario</th><th>Estado</th><th>Acciones</th></tr></thead>
+                    <thead><tr><th>Correo</th><th>Estado</th><th>Acciones</th></tr></thead>
                     <tbody id="admin-user-list"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
